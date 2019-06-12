@@ -31,6 +31,16 @@ void remove_char(string& input, char type)
 	input.erase(remove(input.begin(), input.end(), type), input.end());
 }
 
+bool detect_time_cast(string input)
+{
+	for (unsigned int i = 0; i < input.size(); i++)
+	{
+		if (input.at(i) == '(')
+			return true;
+	}
+	return false;
+}
+
 
 void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 {
@@ -127,6 +137,27 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 }
 
 
+void multipleWords(stringstream& ss, string& word, string& total_word)
+{
+
+	while (ss >> word)
+	{
+		if (word == "AS") //strange cast to DateTime we still need to account for. All times will be the same
+		{
+			ss >> word; //skip DateTime word
+			total_word = "1996-05-27 12:36:24";
+			break;
+		}
+		total_word += " ";
+		total_word += word;
+		if (total_word.at(total_word.size() - 1) == ',' && total_word.at(total_word.size() - 2) == '\'')
+		{
+			break;
+		}
+	}
+}
+
+
 void readFile(ifstream& in, ofstream& out)
 {
 	vector<string> data_entries;
@@ -137,11 +168,9 @@ void readFile(ifstream& in, ofstream& out)
 	int counter = 0;
 
 	in >> word; //skip "create"
-	cout << word << endl;
-	in >> word; //skip "table"
-	cout << word << endl;
+	in >> word; //skip "table";
 	in >> table_name; //table name
-	cout << word << endl;
+	
 	
 	remove_char(table_name, '.'); 
 
@@ -199,28 +228,34 @@ void readFile(ifstream& in, ofstream& out)
 			if (data_begin == true)
 			{
 				string total_word = word;
+				bool single_word = false;
 				if (total_word.at(0) == 'N' && total_word.at(1) == '\'') //if N' occurs
 				{
-					total_word = total_word.substr(2, total_word.size()); 	
+					total_word = total_word.substr(2, total_word.size()); 
+					
 				}
-				cout << total_word << endl;
-				if (total_word.at(total_word.size() - 1) != ',')// && total_word.at(total_word.size() - 2) != '\'') //more then one word in entry, go through words until hits comma
+				else
 				{
-					while (ss >> word)
+					single_word = true;
+					if (detect_time_cast(total_word) == true)
+						multipleWords(ss, word, total_word);
+				}
+			
+				if (total_word.at(total_word.size() - 1) == ',')// && total_word.at(total_word.size() - 2) != '\'') //more then one word in entry, go through words until hits comma
+				{
+					if (total_word.at(total_word.size() - 1) > 0)
 					{
-						if (word == "AS") //strange cast to DateTime we still need to account for. All times will be the same
+						if (total_word.at(total_word.size() - 2) != '\'' && single_word != true)
 						{
-							ss >> word; //skip DateTime word
-							total_word = "1996-05-27 12:36:24";
-							break;
-						}
-						total_word += " ";
-						total_word += word;
-						if (total_word.at(total_word.size() - 1) == ',')
-						{
-							break;
+							multipleWords(ss, word, total_word);
 						}
 					}
+					
+				}
+				else
+				{
+					if (single_word != true)
+					multipleWords(ss, word, total_word);
 				}
 
 				remove_char(total_word, ',');
