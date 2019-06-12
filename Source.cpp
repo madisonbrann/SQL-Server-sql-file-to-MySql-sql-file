@@ -41,7 +41,6 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 
 	for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
 	{
-		//cout << "Name: " << my_schema.access_column(i).get_name() << " Type: " << my_schema.access_column(i).get_type() << " Type_Value: " << my_schema.access_column(i).get_type_value() << " Required: " << my_schema.access_column(i).get_required() << " " << endl;
 		ss << "`" << my_schema.access_column(i).get_name() << "` " << my_schema.access_column(i).get_type();
 
 		if (my_schema.access_column(i).get_type_value() != "uninitialized")
@@ -62,18 +61,69 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 	cout << ss.str();
 	out << ss.str();
 	//END WRITING SCHEMA
-
+	ss.clear();
+	ss.str("");
 	//BEGING WRITING DATA
-	cout << endl << "INSERT INTO `" << my_schema.get_table() << "` (";
+	ss << endl << "INSERT INTO `" << my_schema.get_table() << "` (";
 	for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
 	{
-		cout << "`" << my_schema.access_column(i).get_name() << "`,";
-		if (i == my_schema.num_of_columns - 1) //remove trailing comma and add ')'
+		if (i == my_schema.num_of_columns() - 1) //remove trailing comma and add ')'
 		{
-			cout << "`" << my_schema.access_column(i).get_name() << "`)";
+			ss << "`" << my_schema.access_column(i).get_name() << "`)" << endl << endl;
+		}
+		else
+		{
+			ss << "`" << my_schema.access_column(i).get_name() << "`,";
 		}
 	}
-	
+
+	ss << "VALUES" << endl << endl;
+
+	for (unsigned int i = 0; i < all_data.size(); i++)
+	{
+		if (all_data.at(i).size() > 0) //skip  empty entries
+		{
+
+			ss << "(";
+			for (unsigned int j = 0; j < all_data.at(i).size(); j++)
+			{
+				 if (all_data.at(i).at(j) == "NULL") //keep quotes off of NULL
+				{
+					if (j == all_data.at(i).size() - 1) //once again remove trailing comma in case of NULL
+					{
+						ss << all_data.at(i).at(j);
+					}
+					else
+					{
+						ss << all_data.at(i).at(j) << ",";
+					}
+				}
+
+				else if (j == all_data.at(i).size() - 1)
+				{
+					ss << "'" << all_data.at(i).at(j) << "'"; //remove trailing comma
+				}
+				
+				else
+				{
+
+					ss << "'" << all_data.at(i).at(j) << "',";
+				}
+			}
+			if (i == all_data.size() - 1) //remove trailing comma, add ';'
+			{
+
+				ss << ");" << endl << endl;
+			}
+			else
+			{
+				ss << ")," << endl << endl;
+			}
+		}
+
+	}
+	cout << ss.str();
+	out << ss.str(); 
 }
 
 
@@ -84,10 +134,16 @@ void readFile(ifstream& in, ofstream& out)
 	string word;
 	string table_name;
 	bool end_schema;
+	int counter = 0;
 
 	in >> word; //skip "create"
+	cout << word << endl;
 	in >> word; //skip "table"
+	cout << word << endl;
 	in >> table_name; //table name
+	cout << word << endl;
+	
+	remove_char(table_name, '.'); 
 
 	Schema my_schema(table_name);
 	//BEGIN ACCESSING SCHEMA INFO
@@ -147,10 +203,17 @@ void readFile(ifstream& in, ofstream& out)
 				{
 					total_word = total_word.substr(2, total_word.size()); 	
 				}
-				if (total_word.at(total_word.size() - 1) != ',') //more then one word in entry, go through words until hits comma
+				cout << total_word << endl;
+				if (total_word.at(total_word.size() - 1) != ',')// && total_word.at(total_word.size() - 2) != '\'') //more then one word in entry, go through words until hits comma
 				{
 					while (ss >> word)
 					{
+						if (word == "AS") //strange cast to DateTime we still need to account for. All times will be the same
+						{
+							ss >> word; //skip DateTime word
+							total_word = "1996-05-27 12:36:24";
+							break;
+						}
 						total_word += " ";
 						total_word += word;
 						if (total_word.at(total_word.size() - 1) == ',')
@@ -171,6 +234,9 @@ void readFile(ifstream& in, ofstream& out)
 			remove_char(data_entries.at(data_entries.size() - 1), ')'); //remove ) at end of entry line
 		}
 		all_data.push_back(data_entries);
+		cout << counter << " completed" << endl;
+		counter++;
+		data_entries.clear();
 	}
 
 	//END ACCESSING DATA INFO
