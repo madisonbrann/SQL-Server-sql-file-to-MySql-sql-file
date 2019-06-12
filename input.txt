@@ -1,0 +1,18 @@
+CREATE TABLE [BYUSAPP].[Address](
+	[ID] [int] NOT NULL,
+	[CustomerID] [int] NOT NULL,
+	[Address1] [varchar](100) NULL,
+	[Address2] [varchar](100) NULL,
+	[City] [varchar](100) NULL,
+	[State] [varchar](25) NULL,
+	[ZIP] [varchar](50) NULL,
+	[Country_REF_Id] [int] NULL,
+	[Comment] [varchar](100) NULL,
+	[CreateDt] [datetime] NOT NULL,
+	[CreatedBy] [varchar](50) NOT NULL,
+	[ModifyDt] [datetime] NULL,
+	[ModifiedBy] [varchar](50) NULL
+) ON [PRIMARY]
+
+INSERT [BYUSAPP].[Address] ([ID], [CustomerID], [Address1], [Address2], [City], [State], [ZIP], [Country_REF_Id], [Comment], [CreateDt], [CreatedBy], [ModifyDt], [ModifiedBy]) VALUES (25931, 24011, N'924 CHAMPIONS CT', NULL, N'ROANOKE', N'TX', N'76262', 137, NULL, CAST(0x0000A65500EC9B4C AS DateTime), N'Annette Samuelsen', NULL, NULL)
+INSERT [BYUSAPP].[Address] ([ID], [CustomerID], [Address1], [Address2], [City], [State], [ZIP], [Country_REF_Id], [Comment], [CreateDt], [CreatedBy], [ModifyDt], [ModifiedBy]) VALUES (25932, 24012, N'215 E 3550 N', NULL, N'PROVO', N'UT', N'84604', 137, NULL, CAST(0x0000A65500EDEA03 AS DateTime), N'Annette Samuelsen', NULL, NULL)
