@@ -13,6 +13,10 @@ THINGS TO CHECK:
 -having a value after the int type (sql server does not define but MySQL might need it
 -extra commands at end of attribte like "auto incremental" at the end of the int type
 -casting time as a data entry
+
+DEBUGGING:
+-accounting for N' with a space before the actual entry
+-the AS key word showing up places besides the time cast
 */
 
 
@@ -25,10 +29,17 @@ THINGS TO CHECK:
 
 using namespace std;
 
+int counter = 0;
+
 
 void remove_char(string& input, char type)
 {
 	input.erase(remove(input.begin(), input.end(), type), input.end());
+}
+
+void troubleshoot()
+{
+	// cout << "this happened" << endl;
 }
 
 bool detect_time_cast(string input)
@@ -69,6 +80,7 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 	}
 	ss << ");" << endl;
 	cout << ss.str();
+	cout << my_schema.num_of_columns();
 	out << ss.str();
 	//END WRITING SCHEMA
 	ss.clear();
@@ -132,8 +144,9 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 		}
 
 	}
-	cout << ss.str();
+	// cout << ss.str();
 	out << ss.str(); 
+	cout << counter << " completed" << endl;
 }
 
 
@@ -142,11 +155,14 @@ void multipleWords(stringstream& ss, string& word, string& total_word)
 
 	while (ss >> word)
 	{
-		if (word == "AS") //strange cast to DateTime we still need to account for. All times will be the same
+		if (word == "AS") //strange cast to DateTime we still need to account for. All times will be the same for now
 		{
 			ss >> word; //skip DateTime word
-			total_word = "1996-05-27 12:36:24";
-			break;
+			if (word == "DateTime),")
+			{
+				total_word = "1996-05-27 12:36:24";
+				break;
+			}
 		}
 		total_word += " ";
 		total_word += word;
@@ -165,117 +181,144 @@ void readFile(ifstream& in, ofstream& out)
 	string word;
 	string table_name;
 	bool end_schema;
-	int counter = 0;
 
-	in >> word; //skip "create"
-	in >> word; //skip "table";
-	in >> table_name; //table name
 	
 	
-	remove_char(table_name, '.'); 
 
-	Schema my_schema(table_name);
-	//BEGIN ACCESSING SCHEMA INFO
-	while (getline(in,word)) //go through Schema attributes line at a time
-	{
-		stringstream ss;
-		string name;
-		string type;
-		string required;
-		vector<string> holder;
-		if (word != "")
+		in >> word; //skip "create"
+		in >> word; //skip "table";
+		in >> table_name; //table name
+
+
+		remove_char(table_name, '.');
+
+		Schema my_schema(table_name);
+		//BEGIN ACCESSING SCHEMA INFO
+		while (getline(in, word)) //go through Schema attributes line at a time
 		{
-			if (word.at(0) == ')')
-			{
-				end_schema = true;
-				break;
-			}
 
+			stringstream ss;
+			string name;
+			string type;
+			string required;
+			vector<string> holder;
+			if (word != "")
+			{
+				if (word.at(0) == ')')
+				{
+					end_schema = true;
+					break;
+				}
+
+				ss << word;
+
+				while (ss >> word) //go through each word in the line
+				{
+					holder.push_back(word); //stores each word of line in vector
+				}
+
+				name = holder.at(0);
+				// cout << name << endl;
+				type = holder.at(1);
+			//	cout << type << endl;
+				required = holder.at(2);
+
+				Column my_column(name, type, required);
+				my_schema.add_column(my_column);
+			}
+		}
+
+		//END ACCESSING SCHEMA INFO
+		//BEGIN ACCESSING DATA INFO
+
+		while (getline(in, word)) //go through data entries line at a time
+		{
+			stringstream ss;
+			bool data_begin = false;
 			ss << word;
 
-			while (ss >> word) //go through each word in the line
+			while (ss >> word)
 			{
-				holder.push_back(word); //stores each word of line in vector
-			}
-			
-			name = holder.at(0);
-			type = holder.at(1);
-			required = holder.at(2);
-			
-			Column my_column(name, type, required);			
-			my_schema.add_column(my_column);
-		}
-	}
-
-	//END ACCESSING SCHEMA INFO
-	//BEGIN ACCESSING DATA INFO
-
-	while (getline(in, word)) //go through data entries line at a time
-	{
-		stringstream ss;
-		bool data_begin = false;
-		ss << word;
-
-		while (ss >> word)
-		{
-			if (word == "VALUES") //go past unneeded information to where data actually is
-			{
-				data_begin = true;
-				ss >> word; //iterate to word after VALUE
-				word = word.substr(1, word.size() - 1); //remove ( from first data entry
-			}
-
-			if (data_begin == true)
-			{
-				string total_word = word;
-				bool single_word = false;
-				if (total_word.at(0) == 'N' && total_word.at(1) == '\'') //if N' occurs
+				if (word == "VALUES") //go past unneeded information to where data actually is
 				{
-					total_word = total_word.substr(2, total_word.size()); 
-					
+					data_begin = true;
+					ss >> word; //iterate to word after VALUE
+					word = word.substr(1, word.size() - 1); //remove ( from first data entry
 				}
-				else
+
+				if (data_begin == true)
 				{
-					single_word = true;
-					if (detect_time_cast(total_word) == true)
-						multipleWords(ss, word, total_word);
-				}
-			
-				if (total_word.at(total_word.size() - 1) == ',')// && total_word.at(total_word.size() - 2) != '\'') //more then one word in entry, go through words until hits comma
-				{
-					if (total_word.at(total_word.size() - 1) > 0)
+					string total_word = word;
+					bool single_word = false;
+					if (total_word.at(0) == 'N' && total_word.at(1) == '\'') //if N' occurs
 					{
-						if (total_word.at(total_word.size() - 2) != '\'' && single_word != true)
+						total_word = total_word.substr(2, total_word.size());
+						if (total_word.size() == 0) //to account for any spaces between N' and the first word.
 						{
-							multipleWords(ss, word, total_word);
+							ss >> word;
+							total_word = word;
 						}
 					}
-					
-				}
-				else
-				{
-					if (single_word != true)
-					multipleWords(ss, word, total_word);
-				}
+					else
+					{
+						single_word = true;
+						if (detect_time_cast(total_word) == true)
+							multipleWords(ss, word, total_word);
+					}
 
-				remove_char(total_word, ',');
-				remove_char(total_word, '\'');
-				word = total_word;
-				data_entries.push_back(word);
+					if (total_word.at(total_word.size() - 1) == ',')// && total_word.at(total_word.size() - 2) != '\'') //more then one word in entry, go through words until hits comma
+					{
+						if (total_word.at(total_word.size() - 1) > 0)
+						{
+							if (total_word.at(total_word.size() - 2) != '\'' && single_word != true)
+							{
+								multipleWords(ss, word, total_word);
+							}
+						}
+
+					}
+					else
+					{
+						if (single_word != true)
+							multipleWords(ss, word, total_word);
+					}
+
+					remove_char(total_word, ',');
+					remove_char(total_word, '\'');
+					word = total_word;
+					data_entries.push_back(word);
+				}
 			}
-		}
-		if (data_entries.size() > 0)
-		{
-			remove_char(data_entries.at(data_entries.size() - 1), ')'); //remove ) at end of entry line
-		}
-		all_data.push_back(data_entries);
-		cout << counter << " completed" << endl;
-		counter++;
-		data_entries.clear();
-	}
+			if (data_entries.size() > 0)
+			{
+				remove_char(data_entries.at(data_entries.size() - 1), ')'); //remove ) at end of entry line
+			}
+			all_data.push_back(data_entries);
+			if (data_entries.size() > 0)
+			{
+				//cout << data_entries.at(0) << endl;
 
-	//END ACCESSING DATA INFO
-	writeFile(my_schema, out, all_data);
+				if (data_entries.at(0) == "7766")
+					troubleshoot();
+
+			}
+			//d	cout << counter << " completed" << endl;
+
+			if (data_entries.size() != my_schema.num_of_columns() && data_entries.size() != 0)
+			{
+				for (unsigned int i = 0; i < data_entries.size(); i++)
+				{
+					cout << data_entries.at(i) << endl;
+				}
+				cout << "Entries" << data_entries.size() << endl << endl;
+			}
+
+			counter++;
+			data_entries.clear();
+		}
+
+		//END ACCESSING DATA INFO
+		writeFile(my_schema, out, all_data);
 }
 
 
