@@ -13,24 +13,20 @@ THINGS TO CHECK:
 -having a value after the int type (sql server does not define but MySQL might need it
 -extra commands at end of attribte like "auto incremental" at the end of the int type
 -casting time as a data entry
-
-DEBUGGING:
--accounting for N' with a space before the actual entry
--the AS key word showing up places besides the time cast
 */
 
-
+#define _CRT_SECURE_NO_WARNINGS
 #include<iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <time.h>
 #include "Schema.h"
 #include "Column.h"
 
 using namespace std;
 
 int counter = 0;
-
 
 void remove_char(string& input, char type)
 {
@@ -53,39 +49,46 @@ bool detect_time_cast(string input)
 }
 
 
-void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
+void writeFile(vector<Schema> all_schemas, ofstream& out, vector<vector<string>> all_data)
 {
 	stringstream ss;
 	string output;
 	//BEGIN WRITING SCHEMA
-	ss << "CREATE TABLE IF NOT EXISTS `" << my_schema.get_table() << "` (" << endl;
-
-	for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
+	for (unsigned int i = 0; i < all_schemas.size(); i++)
 	{
-		ss << "`" << my_schema.access_column(i).get_name() << "` " << my_schema.access_column(i).get_type();
+		Schema my_schema = all_schemas.at(i);
 
-		if (my_schema.access_column(i).get_type_value() != "uninitialized")
-		{
-			ss << my_schema.access_column(i).get_type_value();
-		}
-		if (i != my_schema.num_of_columns() - 1) //account for last trailing comma
-		{
-			ss << " " << my_schema.access_column(i).get_required() << "," << endl;
-		}
-		else
-		{
+		ss << "CREATE TABLE IF NOT EXISTS `" << my_schema.get_table() << "` (" << endl;
 
-			ss << " " << my_schema.access_column(i).get_required() << endl;
+		for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
+		{
+			ss << "`" << my_schema.access_column(i).get_name() << "` " << my_schema.access_column(i).get_type();
+
+			if (my_schema.access_column(i).get_type_value() != "uninitialized")
+			{
+				ss << my_schema.access_column(i).get_type_value();
+			}
+			if (i != my_schema.num_of_columns() - 1) //account for last trailing comma
+			{
+				ss << " " << my_schema.access_column(i).get_required() << "," << endl;
+			}
+			else
+			{
+
+				ss << " " << my_schema.access_column(i).get_required() << endl;
+			}
 		}
+		ss << ");" << endl;
+		//cout << ss.str();
+		//cout << my_schema.num_of_columns();
+		
 	}
-	ss << ");" << endl;
-	cout << ss.str();
-	cout << my_schema.num_of_columns();
 	out << ss.str();
 	//END WRITING SCHEMA
 	ss.clear();
 	ss.str("");
 	//BEGING WRITING DATA
+	/*
 	ss << endl << "INSERT INTO `" << my_schema.get_table() << "` (";
 	for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
 	{
@@ -144,8 +147,10 @@ void writeFile(Schema my_schema, ofstream& out, vector<vector<string>> all_data)
 		}
 
 	}
+	*/
 	// cout << ss.str();
-	out << ss.str(); 
+	out << ss.str();
+	
 	cout << counter << " completed" << endl;
 }
 
@@ -178,58 +183,75 @@ void readFile(ifstream& in, ofstream& out)
 {
 	vector<string> data_entries;
 	vector<vector<string>> all_data;
+	vector<Schema> all_schemas;
 	string word;
 	string table_name;
 	bool end_schema;
+	bool begin_schema = false;
+	bool end_all_schema = false;
 
-	
-	
-
-		in >> word; //skip "create"
-		in >> word; //skip "table";
-		in >> table_name; //table name
-
-
-		remove_char(table_name, '.');
-
-		Schema my_schema(table_name);
-		//BEGIN ACCESSING SCHEMA INFO
-		while (getline(in, word)) //go through Schema attributes line at a time
+	while (in >> word) //skip stuff at beginning of sql server .sql file
+	{
+		if (word == "CREATE")
 		{
-
-			stringstream ss;
-			string name;
-			string type;
-			string required;
-			vector<string> holder;
-			if (word != "")
-			{
-				if (word.at(0) == ')')
-				{
-					end_schema = true;
-					break;
-				}
-
-				ss << word;
-
-				while (ss >> word) //go through each word in the line
-				{
-					holder.push_back(word); //stores each word of line in vector
-				}
-
-				name = holder.at(0);
-				// cout << name << endl;
-				type = holder.at(1);
-			//	cout << type << endl;
-				required = holder.at(2);
-
-				Column my_column(name, type, required);
-				my_schema.add_column(my_column);
-			}
+			begin_schema = true;
 		}
 
+
+		if (begin_schema == true)
+		{
+
+
+			// in >> word; //skip "create"
+			in >> word; //skip "table";
+			in >> table_name; //table name
+
+
+			remove_char(table_name, '.');
+
+			Schema my_schema(table_name);
+			//BEGIN ACCESSING SCHEMA INFO
+			while (getline(in, word)) //go through Schema attributes line at a time
+			{
+
+				stringstream ss;
+				string name;
+				string type;
+				string required;
+				vector<string> holder;
+				if (word != "")
+				{
+					if (word.at(0) == ')')
+					{
+						end_schema = true;
+						break;
+					}
+
+					ss << word;
+
+					while (ss >> word) //go through each word in the line
+					{
+						holder.push_back(word); //stores each word of line in vector
+					}
+
+					name = holder.at(0);
+					// cout << name << endl;
+					type = holder.at(1);
+					//	cout << type << endl;
+					required = holder.at(2);
+
+					Column my_column(name, type, required);
+					my_schema.add_column(my_column);
+				}
+			}
+			all_schemas.push_back(my_schema);
+		}
+		begin_schema = false; //move onto next schema 
+	}
 		//END ACCESSING SCHEMA INFO
 		//BEGIN ACCESSING DATA INFO
+		
+	int table_number = 0;
 
 		while (getline(in, word)) //go through data entries line at a time
 		{
@@ -303,7 +325,7 @@ void readFile(ifstream& in, ofstream& out)
 
 			}
 			//d	cout << counter << " completed" << endl;
-
+			/*
 			if (data_entries.size() != my_schema.num_of_columns() && data_entries.size() != 0)
 			{
 				for (unsigned int i = 0; i < data_entries.size(); i++)
@@ -312,13 +334,14 @@ void readFile(ifstream& in, ofstream& out)
 				}
 				cout << "Entries" << data_entries.size() << endl << endl;
 			}
+			*/
 
 			counter++;
 			data_entries.clear();
 		}
 
 		//END ACCESSING DATA INFO
-		writeFile(my_schema, out, all_data);
+		writeFile(all_schemas, out, all_data);
 }
 
 
