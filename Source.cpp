@@ -15,6 +15,8 @@ THINGS TO CHECK:
 -casting time as a data entry
 */
 
+//HERE output for inserts are duplicating and missing stuff
+
 #define _CRT_SECURE_NO_WARNINGS
 #include<iostream>
 #include <fstream>
@@ -87,68 +89,73 @@ void writeFile(vector<Schema> all_schemas, ofstream& out, vector<vector<string>>
 	//END WRITING SCHEMA
 	ss.clear();
 	ss.str("");
+
+
 	//BEGING WRITING DATA
-	/*
-	ss << endl << "INSERT INTO `" << my_schema.get_table() << "` (";
-	for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
+	for (unsigned int i = 0; i < all_schemas.size(); i++)
 	{
-		if (i == my_schema.num_of_columns() - 1) //remove trailing comma and add ')'
+		Schema my_schema = all_schemas.at(i);
+		ss << endl << "INSERT INTO `" << my_schema.get_table() << "` (";
+		for (unsigned int i = 0; i < my_schema.num_of_columns(); i++)
 		{
-			ss << "`" << my_schema.access_column(i).get_name() << "`)" << endl << endl;
-		}
-		else
-		{
-			ss << "`" << my_schema.access_column(i).get_name() << "`,";
-		}
-	}
-
-	ss << "VALUES" << endl << endl;
-
-	for (unsigned int i = 0; i < all_data.size(); i++)
-	{
-		if (all_data.at(i).size() > 0) //skip  empty entries
-		{
-
-			ss << "(";
-			for (unsigned int j = 0; j < all_data.at(i).size(); j++)
+			if (i == my_schema.num_of_columns() - 1) //remove trailing comma and add ')'
 			{
-				 if (all_data.at(i).at(j) == "NULL") //keep quotes off of NULL
-				{
-					if (j == all_data.at(i).size() - 1) //once again remove trailing comma in case of NULL
-					{
-						ss << all_data.at(i).at(j);
-					}
-					else
-					{
-						ss << all_data.at(i).at(j) << ",";
-					}
-				}
-
-				else if (j == all_data.at(i).size() - 1)
-				{
-					ss << "'" << all_data.at(i).at(j) << "'"; //remove trailing comma
-				}
-				
-				else
-				{
-
-					ss << "'" << all_data.at(i).at(j) << "',";
-				}
-			}
-			if (i == all_data.size() - 1) //remove trailing comma, add ';'
-			{
-
-				ss << ");" << endl << endl;
+				ss << "`" << my_schema.access_column(i).get_name() << "`)" << endl << endl;
 			}
 			else
 			{
-				ss << ")," << endl << endl;
+				ss << "`" << my_schema.access_column(i).get_name() << "`,";
 			}
 		}
 
+		ss << "VALUES" << endl << endl;
+		vector<vector<string>> schema_data = my_schema.get_all_data();
+		for (unsigned int i = 0; i < schema_data.size(); i++)
+		{
+			if (schema_data.at(i).size() > 0) //skip  empty entries
+			{
+
+				ss << "(";
+				for (unsigned int j = 0; j < schema_data.at(i).size(); j++)
+				{
+					if (schema_data.at(i).at(j) == "NULL") //keep quotes off of NULL
+					{
+						if (j == schema_data.at(i).size() - 1) //once again remove trailing comma in case of NULL
+						{
+							ss << schema_data.at(i).at(j);
+						}
+						else
+						{
+							ss << schema_data.at(i).at(j) << ",";
+						}
+					}
+
+					else if (j == schema_data.at(i).size() - 1)
+					{
+						ss << "'" << schema_data.at(i).at(j) << "'"; //remove trailing comma
+					}
+
+					else
+					{
+
+						ss << "'" << schema_data.at(i).at(j) << "',";
+					}
+				}
+				if (i == schema_data.size() - 1) //remove trailing comma, add ';'
+				{
+
+					ss << ");" << endl << endl;
+				}
+				else
+				{
+					ss << ")," << endl << endl;
+				}
+			}
+
+		}
+
+		// cout << ss.str();
 	}
-	*/
-	// cout << ss.str();
 	out << ss.str();
 	
 	cout << counter << " completed" << endl;
@@ -189,6 +196,7 @@ void readFile(ifstream& in, ofstream& out)
 	bool end_schema;
 	bool begin_schema = false;
 	bool end_all_schema = false;
+	string current_table;
 
 	while (in >> word) //skip stuff at beginning of sql server .sql file
 	{
@@ -247,6 +255,13 @@ void readFile(ifstream& in, ofstream& out)
 			all_schemas.push_back(my_schema);
 		}
 		begin_schema = false; //move onto next schema 
+		if (word == "INSERT") //have arrived at data
+		{
+			in >> word; //access table name
+			remove_char(word, '.');
+			current_table = word;
+			break;
+		}
 	}
 		//END ACCESSING SCHEMA INFO
 		//BEGIN ACCESSING DATA INFO
@@ -261,6 +276,18 @@ void readFile(ifstream& in, ofstream& out)
 
 			while (ss >> word)
 			{
+				if (word == "INSERT")
+				{
+					ss >> word; //access table name
+					remove_char(word, '.');
+					if (current_table != word)
+					{
+						table_number++; //arrived at new table
+					}
+					current_table = word;
+					data_begin = false;
+				}
+
 				if (word == "VALUES") //go past unneeded information to where data actually is
 				{
 					data_begin = true;
@@ -316,6 +343,7 @@ void readFile(ifstream& in, ofstream& out)
 				remove_char(data_entries.at(data_entries.size() - 1), ')'); //remove ) at end of entry line
 			}
 			all_data.push_back(data_entries);
+		all_schemas.at(table_number).add_data(data_entries);
 			if (data_entries.size() > 0)
 			{
 				//cout << data_entries.at(0) << endl;
@@ -340,6 +368,20 @@ void readFile(ifstream& in, ofstream& out)
 			data_entries.clear();
 		}
 
+for (unsigned int i = 0; i < all_schemas.size(); i++)
+{
+	vector<vector<string>> all_data = all_schemas.at(i).get_all_data();
+	cout << "NEW" << endl << endl;
+	for (unsigned int j = 0; j < all_data.size(); j++)
+	{
+		vector<string> data = all_data.at(j);
+		for (unsigned int k = 0; k < data.size(); k++)
+		{
+			cout << data.at(k) << " ";
+		}
+		cout << endl;
+	}
+}
 		//END ACCESSING DATA INFO
 		writeFile(all_schemas, out, all_data);
 }

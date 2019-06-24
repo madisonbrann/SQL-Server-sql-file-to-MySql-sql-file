@@ -14,6 +14,7 @@ class Schema
 private:
 	string table;
 	vector<Column> schema_columns;
+	vector<vector<string>> all_data;
 
 
 public:
@@ -52,6 +53,16 @@ public:
 	int num_of_columns()
 	{
 		return schema_columns.size();
+	}
+
+	void add_data(vector <string> data_in)
+	{
+		all_data.push_back(data_in);
+	}
+
+	vector<vector<string>> get_all_data()
+	{
+		return all_data;
 	}
 
 };
